@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>정수 유리수 빈출 (1)</title>
+  <style>
+    body { background-color: white; color: black; font-family: sans-serif; }
+    #gameInfo span { margin-right: 20px; }
+    button { margin: 5px; }
+    .choiceButton { display: block; width: 100%; text-align: left; margin: 5px 0; }
+    #energyBarContainer { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <!-- 시작 화면 -->
+  <div id="startScreen">
+    <h1>정수 유리수 빈출 (1)</h1>
+    <input type="text" id="playerName" placeholder="이름 입력" />
+    <select id="difficulty">
+      <option value="최상">최상</option>
+      <option value="상">상</option>
+      <option value="중">중</option>
+      <option value="하">하</option>
+    </select>
+    <button id="startButton">게임 시작</button>
+  </div>
+
+  <!-- 게임 화면 -->
+  <div id="gameScreen" style="display:none;">
+    <div id="gameInfo">
+      <span id="lives">남은 기회: 3</span>
+      <span id="score">점수: 0</span>
+      <span id="totalTime">게임 시간: 0초</span>
+    </div>
+    <div id="energyBarContainer" style="width:300px; height:20px; border:1px solid black;">
+      <div id="energyBar" style="height:100%; background-color:black; width:100%;"></div>
+    </div>
+    <div id="problemArea"></div>
+    <div id="choicesArea"></div>
+    <button id="nextButton" disabled>다음 문제</button>
+  </div>
+
+  <!-- 종료 화면 -->
+  <div id="endScreen" style="display:none;">
+    <h2>게임 종료</h2>
+    <p id="finalScore"></p>
+    <p id="finalTime"></p>
+    <button id="sendScoreButton">점수전송</button>
+    <pre id="response"></pre>
+  </div>
+
+  <script>
+    // 문제 데이터 (총 28문제: 유형 A, B, C, D 각 7문제)
+    const problems = [
+      // [유형 A: 수의 분류, 수직선, 절댓값 등]
+      {
+        question: "다음 수: \\(+4\\), \\(-4.2\\), \\(\\dfrac{12}{6}\\), \\(-3.8\\), \\(-\\dfrac{6}{7}\\), \\(2.3\\).",
+        choices: [
+          "정수는 2개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(-4.2\\)는 \\(2.3\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(-3.8\\)이다."
+        ],
+        correct: "정수는 2개이다."
+      },
+      {
+        question: "다음 수: \\(+2\\), \\(-4.5\\), \\(\\dfrac{1}{2}\\), \\(-3.3\\), \\(-\\dfrac{8}{9}\\), \\(-3\\).",
+        choices: [
+          "정수는 3개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(-4.5\\)는 \\(-3\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(-3.3\\)이다."
+        ],
+        correct: "양의 유리수는 2개이다."
+      },
+      {
+        question: "다음 수: \\(+6\\), \\(-2.2\\), \\(\\dfrac{18}{6}\\), \\(-3.7\\), \\(-\\dfrac{5}{8}\\), \\(1.1\\).",
+        choices: [
+          "정수는 3개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(-2.2\\)는 \\(-3.7\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(-\\dfrac{5}{8}\\)이다."
+        ],
+        correct: "수직선에서 \\(-2.2\\)는 \\(-3.7\\)보다 오른쪽에 있다."
+      },
+      {
+        question: "다음 수: \\(+7\\), \\(-4\\), \\(\\dfrac{9}{3}\\), \\(-5\\), \\(-\\dfrac{7}{8}\\), \\(2.8\\).",
+        choices: [
+          "정수는 3개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(-4\\)는 \\(2.8\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(2.8\\)이다."
+        ],
+        correct: "음의 정수는 2개이다."
+      },
+      {
+        question: "다음 수: \\(+3.3\\), \\(-2.1\\), \\(\\dfrac{8}{4}\\), \\(-4.5\\), \\(-\\dfrac{1}{2}\\), \\(2.7\\).",
+        choices: [
+          "정수는 2개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(-2.1\\)는 \\(2.7\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(-4.5\\)이다."
+        ],
+        correct: "절댓값이 가장 큰 수는 \\(-4.5\\)이다."
+      },
+      {
+        question: "다음 수: \\(+4.5\\), \\(-3.3\\), \\(\\dfrac{16}{4}\\), \\(-2.2\\), \\(-\\dfrac{5}{6}\\), \\(0.9\\).",
+        choices: [
+          "정수는 2개이다.",
+          "양의 유리수는 2개이다.",
+          "수직선에서 \\(4.5\\)는 \\(0.9\\)보다 오른쪽에 있다.",
+          "음의 정수는 2개이다.",
+          "절댓값이 가장 큰 수는 \\(-\\dfrac{5}{6}\\)이다."
+        ],
+        correct: "수직선에서 \\(4.5\\)는 \\(0.9\\)보다 오른쪽에 있다."
+      },
+      {
+        question: "다음 수: \\(+8\\), \\(-3.6\\), \\(\\dfrac{21}{7}\\), \\(-2.4\\), \\(-\\dfrac{7}{10}\\), \\(3.2\\).",
+        choices: [
+          "정수는 2개이다.",
+          "양의 유리수는 4개이다.",
+          "수직선에서 \\(-3.6\\)는 \\(3.2\\)보다 오른쪽에 있다.",
+          "음의 정수는 1개이다.",
+          "절댓값이 가장 큰 수는 \\(-3.6\\)이다."
+        ],
+        correct: "정수는 2개이다."
+      },
+
+      // [유형 B: 유리수, 정수 관련 개념 (무리수/실수 언급 삭제)]
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "유리수는 자연수와 정수로만 분류할 수 있다.",
+          "양의 정수와 음의 정수를 합한 것을 정수라 한다.",
+          "자연수에 음의 부호를 붙인 수를 양의 정수라 한다.",
+          "양의 유리수와 음의 유리수를 합한 수를 유리수라 한다.",
+          "분자와 분모가 양의 정수인 분수에 음의 부호를 붙인 수를 음의 유리수라 한다."
+        ],
+        correct: "분자와 분모가 양의 정수인 분수에 음의 부호를 붙인 수를 음의 유리수라 한다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "유리수는 자연수와 음의 정수로 분류된다.",
+          "자연수에 양의 부호를 붙인 수를 음의 정수라 한다.",
+          "음의 유리수는 음의 정수만으로 이루어진다.",
+          "양의 유리수에 음의 정수를 곱하면 음의 정수가 된다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙인 수를 음의 유리수라 한다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙인 수를 음의 유리수라 한다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "자연수에 0을 더한 수를 유리수라 한다.",
+          "정수에 1을 더한 수는 모두 유리수가 아니다.",
+          "분모가 1인 분수만을 유리수라 한다.",
+          "양의 유리수와 음의 유리수를 구분하면, 음의 유리수는 항상 분모가 음수이다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "유리수는 분자가 1인 분수 형태로만 나타낼 수 있다.",
+          "자연수에 음의 부호를 붙이면 양의 정수가 된다.",
+          "음의 정수는 음의 유리수가 아니다.",
+          "분모가 음수인 분수는 음의 유리수라 한다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "모든 유리수는 항상 양의 정수와 음의 정수로만 이루어진다.",
+          "음의 정수는 음의 유리수가 아니며, 양의 정수만이 유리수이다.",
+          "자연수는 음의 정수가 될 수 있다.",
+          "분모와 분자가 모두 음의 정수인 분수는 음의 유리수라 한다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "유리수는 정수와 소수로 구분된다.",
+          "자연수는 정수의 부분집합이 아니다.",
+          "음의 유리수는 항상 소수의 형태로 나타낼 수 있다.",
+          "양의 유리수에 음수를 곱하면 항상 정수가 된다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+      },
+      {
+        question: "다음 설명 중 옳은 것은?",
+        choices: [
+          "유리수는 모두 자연수이다.",
+          "정수에 1을 더하면 유리수가 될 수 없다.",
+          "분수의 분모가 1이면 그 분수는 무조건 유리수가 아니다.",
+          "음의 정수는 항상 음의 유리수에 속하지 않는다.",
+          "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+        ],
+        correct: "분자와 분모가 양의 자연수인 분수에 음의 부호를 붙이면 음의 유리수가 된다."
+      },
+
+      // [유형 C: 수직선에서 같은 거리에 있는 점]
+      {
+        question: "수직선 위에서 \\(-3\\)과 \\(10\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(3\\)",
+          "\\(3.5\\)",
+          "\\(4\\)",
+          "\\(4.5\\)",
+          "\\(5\\)"
+        ],
+        correct: "\\(3.5\\)"
+      },
+      {
+        question: "수직선 위에서 \\(2\\)와 \\(8\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(4\\)",
+          "\\(5\\)",
+          "\\(6\\)",
+          "\\(7\\)",
+          "\\(8\\)"
+        ],
+        correct: "\\(5\\)"
+      },
+      {
+        question: "수직선 위에서 \\(-6\\)과 \\(4\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(-1\\)",
+          "\\(0\\)",
+          "\\(1\\)",
+          "\\(-2\\)",
+          "\\(-3\\)"
+        ],
+        correct: "\\(-1\\)"
+      },
+      {
+        question: "수직선 위에서 \\(5\\)와 \\(13\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(8\\)",
+          "\\(9\\)",
+          "\\(10\\)",
+          "\\(11\\)",
+          "\\(12\\)"
+        ],
+        correct: "\\(9\\)"
+      },
+      {
+        question: "수직선 위에서 \\(-10\\)과 \\(6\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(-3\\)",
+          "\\(-2\\)",
+          "\\(-1\\)",
+          "\\(0\\)",
+          "\\(1\\)"
+        ],
+        correct: "\\(-2\\)"
+      },
+      {
+        question: "수직선 위에서 \\(-7\\)과 \\(-1\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(-6\\)",
+          "\\(-5\\)",
+          "\\(-4\\)",
+          "\\(-3\\)",
+          "\\(-2\\)"
+        ],
+        correct: "\\(-4\\)"
+      },
+      {
+        question: "수직선 위에서 \\(0\\)과 \\(7\\)에 대응하는 점으로부터 같은 거리에 있는 점은?",
+        choices: [
+          "\\(2\\)",
+          "\\(3\\)",
+          "\\(3.5\\)",
+          "\\(4\\)",
+          "\\(5\\)"
+        ],
+        correct: "\\(3.5\\)"
+      },
+
+      // [유형 D: 절댓값 조건 a, b - 합이 될 수 없는 수]
+      {
+        question: "절댓값이 \\(3\\)인 수를 \\(a\\), 절댓값이 \\(5\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(8\\)",
+          "\\(-2\\)",
+          "\\(0\\)",
+          "\\(2\\)",
+          "\\(-8\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(4\\)인 수를 \\(a\\), 절댓값이 \\(6\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(10\\)",
+          "\\(-2\\)",
+          "\\(0\\)",
+          "\\(2\\)",
+          "\\(-10\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(2\\)인 수를 \\(a\\), 절댓값이 \\(5\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(7\\)",
+          "\\(-3\\)",
+          "\\(0\\)",
+          "\\(3\\)",
+          "\\(-7\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(3\\)인 수를 \\(a\\), 절댓값이 \\(7\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(10\\)",
+          "\\(-4\\)",
+          "\\(0\\)",
+          "\\(4\\)",
+          "\\(-10\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(1\\)인 수를 \\(a\\), 절댓값이 \\(4\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(5\\)",
+          "\\(-3\\)",
+          "\\(0\\)",
+          "\\(3\\)",
+          "\\(-5\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(2\\)인 수를 \\(a\\), 절댓값이 \\(6\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(8\\)",
+          "\\(-4\\)",
+          "\\(0\\)",
+          "\\(4\\)",
+          "\\(-8\\)"
+        ],
+        correct: "\\(0\\)"
+      },
+      {
+        question: "절댓값이 \\(3\\)인 수를 \\(a\\), 절댓값이 \\(8\\)인 수를 \\(b\\)라 할 때, \\(a+b\\)가 될 수 없는 수는?",
+        choices: [
+          "\\(11\\)",
+          "\\(-5\\)",
+          "\\(0\\)",
+          "\\(5\\)",
+          "\\(-11\\)"
+        ],
+        correct: "\\(0\\)"
+      }
+    ];
+
+    // 전역 변수
+    let currentProblemIndex = 0;
+    let score = 0;
+    let lives = 3;
+    let totalTimeElapsed = 0;
+    let questionTimeLimit = 0; // 초 (난이도별)
+    let pointsPerQuestion = 0;
+    let timerInterval, energyInterval, gameInterval;
+    let currentTimer = 0;
+    let answerChosen = false;
+    let currentShuffledChoices = [];
+    let currentCorrectIndex = -1;
+    let selectedDifficulty = "";
+    let playerName = "";
+
+    const startScreen = document.getElementById("startScreen");
+    const gameScreen = document.getElementById("gameScreen");
+    const endScreen = document.getElementById("endScreen");
+    const problemArea = document.getElementById("problemArea");
+    const choicesArea = document.getElementById("choicesArea");
+    const nextButton = document.getElementById("nextButton");
+    const livesDisplay = document.getElementById("lives");
+    const scoreDisplay = document.getElementById("score");
+    const totalTimeDisplay = document.getElementById("totalTime");
+    const energyBar = document.getElementById("energyBar");
+    const finalScoreDisplay = document.getElementById("finalScore");
+    const finalTimeDisplay = document.getElementById("finalTime");
+    const sendScoreButton = document.getElementById("sendScoreButton");
+    const responseDisplay = document.getElementById("response");
+
+    // Fisher-Yates shuffle
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // 문제 데이터 전체 섞기
+    shuffleArray(problems);
+
+    // 난이도에 따른 설정
+    function setDifficultySettings(diff) {
+      selectedDifficulty = diff;
+      if(diff === "최상") { questionTimeLimit = 20; pointsPerQuestion = 20; }
+      else if(diff === "상") { questionTimeLimit = 30; pointsPerQuestion = 15; }
+      else if(diff === "중") { questionTimeLimit = 40; pointsPerQuestion = 13; }
+      else if(diff === "하") { questionTimeLimit = 0; pointsPerQuestion = 10; }
+    }
+
+    // 문제 렌더링
+    function renderProblem() {
+      answerChosen = false;
+      nextButton.disabled = true;
+      choicesArea.innerHTML = "";
+      problemArea.innerHTML = "";
+      // 만약 모든 문제를 다 썼다면 랜덤 문제 계속 출제
+      if (currentProblemIndex >= problems.length) {
+        currentProblemIndex = Math.floor(Math.random() * problems.length);
+      }
+      const prob = problems[currentProblemIndex];
+      problemArea.innerHTML = "<p>" + prob.question + "</p>";
+
+      // 보기를 복사 후 섞기
+      currentShuffledChoices = prob.choices.slice();
+      shuffleArray(currentShuffledChoices);
+      currentShuffledChoices.forEach((choice, index) => {
+        if(choice === prob.correct) { currentCorrectIndex = index; }
+        const btn = document.createElement("button");
+        btn.className = "choiceButton";
+        btn.innerHTML = choice;
+        btn.onclick = () => { checkAnswer(index); };
+        choicesArea.appendChild(btn);
+      });
+      MathJax.typeset();
+      resetEnergyBar();
+      if(questionTimeLimit > 0) { startQuestionTimer(); }
+    }
+
+    // 답안 검사
+    function checkAnswer(chosenIndex) {
+      if(answerChosen) return;
+      answerChosen = true;
+      clearInterval(timerInterval);
+      clearInterval(energyInterval);
+      const buttons = document.getElementsByClassName("choiceButton");
+      // 정답이면
+      if(chosenIndex === currentCorrectIndex) {
+        buttons[chosenIndex].style.backgroundColor = "lightgreen";
+        score += pointsPerQuestion;
+        scoreDisplay.innerText = "점수: " + score;
+      } else {
+        buttons[chosenIndex].style.backgroundColor = "pink";
+        buttons[currentCorrectIndex].style.backgroundColor = "lightgreen";
+        lives--;
+        livesDisplay.innerText = "남은 기회: " + lives;
+      }
+      if(lives <= 0) {
+        endGame();
+      }
+      nextButton.disabled = false;
+    }
+
+    // 시간 초과 처리 (에너지바 소진)
+    function timeUp() {
+      if(answerChosen) return;
+      answerChosen = true;
+      const buttons = document.getElementsByClassName("choiceButton");
+      buttons[currentCorrectIndex].style.backgroundColor = "lightgreen";
+      lives--;
+      livesDisplay.innerText = "남은 기회: " + lives;
+      if(lives <= 0) {
+        endGame();
+      }
+      nextButton.disabled = false;
+    }
+
+    // 문제 타이머 시작
+    function startQuestionTimer() {
+      currentTimer = questionTimeLimit;
+      timerInterval = setInterval(() => {
+        currentTimer--;
+        if(currentTimer <= 0) {
+          clearInterval(timerInterval);
+          timeUp();
+        }
+      }, 1000);
+    }
+
+    // 에너지바 초기화 및 소진 애니메이션
+    function resetEnergyBar() {
+      if(questionTimeLimit > 0) {
+        energyBar.style.width = "100%";
+        let width = 100;
+        const decrement = 100 / (questionTimeLimit * 10);
+        energyInterval = setInterval(() => {
+          width -= decrement;
+          if(width <= 0) {
+            width = 0;
+            clearInterval(energyInterval);
+          }
+          energyBar.style.width = width + "%";
+        }, 100);
+      } else {
+        energyBar.style.width = "100%";
+      }
+    }
+
+    // 전체 게임 시간 업데이트
+    function startGameTimer() {
+      gameInterval = setInterval(() => {
+        totalTimeElapsed++;
+        totalTimeDisplay.innerText = "게임 시간: " + totalTimeElapsed + "초";
+      }, 1000);
+    }
+
+    // 다음 문제로 넘어가기
+    nextButton.addEventListener("click", () => {
+      currentProblemIndex++;
+      renderProblem();
+    });
+
+    // 게임 종료
+    function endGame() {
+      clearInterval(timerInterval);
+      clearInterval(energyInterval);
+      clearInterval(gameInterval);
+      gameScreen.style.display = "none";
+      endScreen.style.display = "block";
+      finalScoreDisplay.innerText = "최종 점수: " + score;
+      finalTimeDisplay.innerText = "총 게임 시간: " + totalTimeElapsed + "초";
+      MathJax.typeset();
+    }
+
+    // 시작 버튼 이벤트
+    document.getElementById("startButton").addEventListener("click", () => {
+      playerName = document.getElementById("playerName").value.trim();
+      if(playerName === "") {
+        alert("이름을 입력하세요.");
+        return;
+      }
+      const diff = document.getElementById("difficulty").value;
+      setDifficultySettings(diff);
+      startScreen.style.display = "none";
+      gameScreen.style.display = "block";
+      startGameTimer();
+      renderProblem();
+    });
+
+    // 점수 전송 함수 (문제에서 요구한 코드)
+    async function saveData(game, name, score, elapsedTime) {
+      const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+      const requestData = {
+        game,
+        name,
+        score: parseInt(score, 10),
+        elapsedTime: parseInt(elapsedTime, 10)
+      };
+      try {
+        const response = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+        });
+        const responseData = await response.json();
+        if (response.ok) {
+          document.getElementById('response').innerText = `성공: ${JSON.stringify(responseData, null, 2)}`;
+        } else {
+          document.getElementById('response').innerText = `오류: ${JSON.stringify(responseData, null, 2)}`;
+        }
+      } catch (error) {
+        console.error('요청 실패:', error);
+        document.getElementById('response').innerText = `네트워크 오류: ${error.message}`;
+      }
+    }
+
+    // 점수 전송 버튼 이벤트
+    sendScoreButton.addEventListener("click", () => {
+      saveData("정수 유리수 빈출 (1)", playerName, score, totalTimeElapsed);
+    });
+  </script>
+  <!-- MathJax 로드 -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+</body>
+</html>
